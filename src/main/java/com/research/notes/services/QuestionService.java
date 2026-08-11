@@ -34,7 +34,8 @@ public class QuestionService {
                 .createdBy(author)
                 .build();
 
-        return QuestionResponse.from(questionRepository.save(question));
+        // flush so Hibernate populates the generated createdTime before mapping
+        return QuestionResponse.from(questionRepository.saveAndFlush(question));
     }
 
     @Transactional(readOnly = true)
