@@ -2,12 +2,14 @@ package com.research.notes.services;
 
 import java.util.UUID;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.research.notes.models.dtos.CreateQuestionRequest;
+import com.research.notes.models.dtos.PageResponse;
 import com.research.notes.models.dtos.QuestionResponse;
 import com.research.notes.models.entities.QuestionEntity;
 import com.research.notes.models.entities.UserEntity;
@@ -36,6 +38,14 @@ public class QuestionService {
 
         // flush so Hibernate populates the generated createdTime before mapping
         return QuestionResponse.from(questionRepository.saveAndFlush(question));
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<QuestionResponse> listByUser(UUID userId, Pageable pageable) {
+        if (!userRepository.existsById(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User %s not found".formatted(userId));
+        }
+        return PageResponse.from(questionRepository.findByCreatedById(userId, pageable).map(QuestionResponse::from));
     }
 
     @Transactional(readOnly = true)
