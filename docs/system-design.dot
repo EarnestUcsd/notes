@@ -1,0 +1,66 @@
+digraph notes {
+  rankdir=TB;
+  bgcolor="white";
+  fontname="Helvetica";
+  node [fontname="Helvetica", shape=box, style="rounded,filled", color="#3a4a5a", penwidth=1.2];
+  edge [fontname="Helvetica", fontsize=10, color="#55606b"];
+
+  labelloc="t";
+  label=<<b>notes — current system design (commit 34f2dbf)</b><br/><font point-size="11">Spring Boot 3.5.4 · Java 24 · Spring AI (OpenAI) · JPA/Hibernate · Liquibase · Postgres</font>>;
+  fontsize=18;
+
+  client [label="HTTP client\n(curl / browser)", shape=box, style="rounded,filled", fillcolor="#e8eef5"];
+
+  subgraph cluster_app {
+    label="NotesApplication (Spring Boot, @EnableJpaRepositories)";
+    style="rounded,filled"; fillcolor="#f7f9fb"; color="#c2ccd6"; fontsize=13;
+
+    subgraph cluster_web {
+      label="Web layer  @RestController  /v1";
+      style="rounded,filled"; fillcolor="#eaf3ff"; color="#a8c6ea"; fontsize=11;
+      chat [label="ChatController\nGET /v1/ai/generate?message=\nGET /v1/ai/generateStream (Flux)", fillcolor="#ffffff"];
+      qc   [label="QuestionController\nGET /v1/question/{id}\n(stub: echoes id, 202)", fillcolor="#ffffff", color="#d08a00"];
+    }
+
+    subgraph cluster_svc {
+      label="Service layer";
+      style="rounded,dashed,filled"; fillcolor="#fff6e5"; color="#e0b96a"; fontsize=11;
+      svc [label="(none yet)\nno service / DTO / mapper layer\ncontrollers talk straight to model+AI", fillcolor="#fff6e5", style="rounded,dashed,filled", color="#d08a00"];
+    }
+
+    subgraph cluster_data {
+      label="Persistence layer";
+      style="rounded,filled"; fillcolor="#eef7ee"; color="#a9cfa9"; fontsize=11;
+      urepo [label="UserRepository\nJpaRepository<UserEntity, UUID>", fillcolor="#ffffff"];
+      qrepo [label="QuestionRepository\nJpaRepository<QuestionEntity, UUID>", fillcolor="#ffffff"];
+      uent  [label="UserEntity  @Table(users)\nid UUID, username, email,\npassword, createdTime\n1..N createdQuestions", fillcolor="#ffffff"];
+      qent  [label="QuestionEntity  @Table(questions)\nid UUID, question(1000),\ncreatedBy -> UserEntity (ManyToOne),\ncreatedTime", fillcolor="#ffffff"];
+    }
+  }
+
+  subgraph cluster_ext {
+    label="External / infra";
+    style="rounded,filled"; fillcolor="#faf3f7"; color="#dcc0d0"; fontsize=13;
+    openai [label="OpenAI API\nspring-ai-starter-model-openai\nOpenAiChatModel\nkey: ${OPENAI_API_KEY}", shape=box, fillcolor="#ffffff"];
+    pg [label="PostgreSQL\nlocalhost:5432/postgres", shape=cylinder, style=filled, fillcolor="#ffffff"];
+    lb [label="Liquibase changelog\nchangeset-1.sql:\ntest_table, users, questions(FK)", fillcolor="#ffffff"];
+    h2 [label="H2 (runtime dep,\nnot configured)", fillcolor="#f2f2f2", color="#999999", style="rounded,filled,dashed"];
+  }
+
+  client -> chat [label="REST"];
+  client -> qc   [label="REST"];
+  chat -> openai [label="chatModel.call() / .stream()"];
+  qc -> svc [style=dashed, label="missing wiring", color="#d08a00", fontcolor="#d08a00"];
+  svc -> qrepo [style=dashed, color="#d08a00"];
+  qrepo -> qent;
+  urepo -> uent;
+  qent -> uent [label="created_by FK", style=dashed];
+  qent -> pg [label="Hibernate JDBC"];
+  uent -> pg [label="Hibernate JDBC"];
+  lb -> pg [label="schema migration on boot"];
+  h2 -> pg [style=invis];
+
+  note [shape=note, fillcolor="#fffbe6", color="#c9b458", style=filled,
+        label="Gaps / notes\l• QuestionController is a stub — no repo use, no POST/create\l• No service, DTO, validation, or error handling layer\l• No auth/security; password stored as plain column\l• application.yaml has typo: `api-key::`\l• Repositories declared but never injected anywhere\l• AI output is not persisted to questions/answers\l• Only test is the default context-load test\l"];
+  { rank=sink; note; }
+}
